@@ -1,7 +1,7 @@
 import sys
 sys.dont_write_bytecode = True
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import cv2
 from PIL import Image, ImageTk
 import json
@@ -91,32 +91,77 @@ class App:
         self.entrance_video_feed = VideoFeed(entrance_frame, video_source=self.entrance_camera)
         self.exit_video_feed = VideoFeed(exit_frame, video_source=self.exit_camera)
 
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(side="top", pady=5)
-
-        exit_button = tk.Button(button_frame, text="Thoát", command=self.root.destroy)
-        exit_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-
-        config_button = tk.Button(button_frame, text="Cài đặt", command=self.open_config_window)
-        config_button.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
-
+        # Section Nút XE VÀO
         entrance_button_frame = tk.Frame(entrance_frame)
         entrance_button_frame.pack(side="bottom", pady=5)
 
-        entrance_allow_button = tk.Button(entrance_button_frame, text="CHO PHÉP XE VÀO", command=self.allow_entrance_vehicle)
-        entrance_allow_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        entrance_allow_button = tk.Button(entrance_button_frame, text="CHO PHÉP XE VÀO (F7)", bg="blue", fg="white", font=("Arial", 14), command=self.allow_entrance_vehicle)
+        entrance_allow_button.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
 
-        entrance_cancel_button = tk.Button(entrance_button_frame, text="HUỶ XE VÀO", command=self.cancel_entrance_registration)
-        entrance_cancel_button.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        entrance_cancel_button = tk.Button(entrance_button_frame, text="HUỶ XE VÀO (F8)", bg="red", fg="white", font=("Arial", 14), command=self.cancel_entrance_registration)
+        entrance_cancel_button.grid(row=4, column=0, padx=5, pady=5, sticky="ew")
+        
+        # 3 dòng kết quả nhận diện xe vào
+        entrance_result_label = tk.Label(entrance_button_frame, text="KẾT QUẢ NHẬN DIỆN XE VÀO", bg="blue", fg="white", font=("Arial Bold", 14))
+        entrance_result_label.grid(row=0, column=1, padx=15, pady=5, sticky="ew")
 
+        entrance_ocr_label = tk.Label(entrance_button_frame, text="DDDL-DDDDD", bg="yellow", fg="red", font=("Arial Bold", 27))
+        entrance_ocr_label.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
+
+        entrance_time_label = tk.Label(entrance_button_frame, text="Giờ vào: DD/MM/YY HH:MM", bg="aqua", fg="black", font=("Arial", 14))
+        entrance_time_label.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
+
+        # Frame chứa kết quả nhận diện xe vào, chiều cao bằng tổng chiều cao của 3 dòng kết quả trên
+        ocr_entrance_result_frame = tk.Frame(entrance_button_frame, bg="black")
+        ocr_entrance_result_frame.grid(row=0, column=0, rowspan=3, padx=5, pady=5, sticky="nsew")
+        # Set uniform height for all the rows in the grid
+        entrance_button_frame.grid_rowconfigure((0, 1, 2), weight=1, uniform="equal")
+        # Adjust the frame to maintain a 16:9 aspect ratio
+        ocr_entrance_result_frame.bind("<Configure>", lambda e: ocr_entrance_result_frame.configure(width=int(ocr_entrance_result_frame.winfo_height() * 16 / 9)))
+
+        # Frame đọc thẻ xe vào
+        entrance_card_frame = tk.Label(entrance_button_frame, text="Đọc thẻ NULL - Mã thẻ: XXX", bg="yellow", fg="black", font=("Arial Bold", 15))
+        entrance_card_frame.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
+
+        config_button = tk.Button(entrance_button_frame, font=("Arial", 14), text="Cài đặt", command=self.open_config_window)
+        config_button.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
+        # END Section Nút XE VÀO
+
+        # Section Nút XE RA
         exit_button_frame = tk.Frame(exit_frame)
         exit_button_frame.pack(side="bottom", pady=5)
 
-        exit_allow_button = tk.Button(exit_button_frame, text="CHO PHÉP XE RA", command=self.allow_exit_vehicle)
-        exit_allow_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        exit_allow_button = tk.Button(exit_button_frame, text="CHO PHÉP XE RA (F11)", bg="blue", fg="white", font=("Arial", 14), command=self.allow_exit_vehicle)
+        exit_allow_button.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
         
-        exit_cancel_button = tk.Button(exit_button_frame, text="HUỶ XE RA", command=self.cancel_exit_registration)
-        exit_cancel_button.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        exit_cancel_button = tk.Button(exit_button_frame, text="HUỶ XE RA (F12)", bg="red", fg="white", font=("Arial", 14), command=self.cancel_exit_registration)
+        exit_cancel_button.grid(row=4, column=0, padx=5, pady=5, sticky="ew")
+
+        # 3 dòng kết quả nhận diện xe ra
+        exit_result_label = tk.Label(exit_button_frame, text="KẾT QUẢ XE RA TRÙNG KHỚP", bg="green", fg="white", font=("Arial Bold", 14))
+        exit_result_label.grid(row=0, column=1, padx=15, pady=5, sticky="ew")
+
+        exit_ocr_label = tk.Label(exit_button_frame, text="DDDL-DDDDD", bg="yellow", fg="red", font=("Arial Bold", 27))
+        exit_ocr_label.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
+
+        exit_time_label = tk.Label(exit_button_frame, text="Giờ ra: DD/MM/YY HH:MM", bg="aqua", fg="black", font=("Arial", 14))
+        exit_time_label.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
+
+        # Frame chứa kết quả nhận diện xe ra, chiều cao bằng tổng chiều cao của 3 dòng kết quả trên
+        ocr_exit_result_frame = tk.Frame(exit_button_frame, bg="black")
+        ocr_exit_result_frame.grid(row=0, column=0, rowspan=3, padx=5, pady=5, sticky="nsew")
+        # Set uniform height for all the rows in the grid
+        exit_button_frame.grid_rowconfigure((0, 1, 2), weight=1, uniform="equal")
+        # Adjust the frame to maintain a 16:9 aspect ratio
+        ocr_exit_result_frame.bind("<Configure>", lambda e: ocr_exit_result_frame.configure(width=int(ocr_exit_result_frame.winfo_height() * 16 / 9)))
+        
+        # Frame đọc thẻ xe ra
+        exit_card_frame = tk.Label(exit_button_frame, text="Đọc thẻ NULL - Mã thẻ: XXX", bg="yellow", fg="black", font=("Arial Bold", 15))
+        exit_card_frame.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
+
+        exit_button = tk.Button(exit_button_frame, bg="red", fg="white", font=("Arial", 14), text="Thoát", command=self.on_close)
+        exit_button.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
+        # END Section Nút XE RA
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -183,8 +228,10 @@ class App:
             print("Configuration saved.")
 
     def on_close(self):
-        self.save_configuration()
-        self.root.destroy()
+        # Ask the user if they want to exit
+        if messagebox.askyesno("Thoát", "Bạn có chắc chắn muốn thoát?"):
+            self.save_configuration()
+            self.root.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()
