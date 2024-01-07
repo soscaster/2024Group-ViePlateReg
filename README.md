@@ -28,6 +28,7 @@ In order for the members not to create many structurally different pieces of cod
 |Student ID| Name | Major | Email address|
 |:---:|:---:|:---:|:---|
 |`BI12-044`|Nguyễn Vũ Bách|ICT|bachNV.BI12-044@st.usth.edu.vn|
+|`BI12-213`|Đoàn Phú Khoa|ICT|khoadp.bi12-213@st.usth.edu.vn|
 |`BI12-257`|Ngô Thế Long|ICT|longnt.bi12-257@st.usth.edu.vn|
 |`BI12-264`|Đặng Vũ Minh|ICT|minhdv.bi12-264@st.usth.edu.vn|
 |`BI12-271`|Nguyễn Quang Minh|ICT|minhnq.bi12-271@st.usth.edu.vn|
