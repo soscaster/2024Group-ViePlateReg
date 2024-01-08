@@ -30,13 +30,13 @@ def extract_text(path):
             break
 
     (x, y, w, h) = cv2.boundingRect(number_plate_shape)
-    number_plate = grayscale[y:y + h, x:x + w]
+    croped_img = grayscale[y:y + h, x:x + w]
 
     reader = Reader(['en'])
-    detection = reader.readtext(number_plate)
+    detection = reader.readtext(croped_img)
     plate = ' '.join(detect[1] for detect in detection) #read both line of plate
 
-    return plate
+    return plate, croped_img
 
     # if len(detection) == 0:
     #     text = "Không thấy bảng số xe"
