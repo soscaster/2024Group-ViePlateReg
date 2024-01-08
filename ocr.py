@@ -38,6 +38,8 @@ def extract_text(path):
 
     return plate
 
+print(extract_text("test.jpg"))
+
     # if len(detection) == 0:
     #     text = "Không thấy bảng số xe"
     #     img_pil = Image.fromarray(img) #image biến lấy khung hình từ webcam

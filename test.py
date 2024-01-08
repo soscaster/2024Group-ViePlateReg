@@ -205,7 +205,10 @@ class App:
 
         self.is_entrance_enabled = True
         self.start_serial_thread()
-        self.exit_thread = threading.Event()
+        self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle())
+        self.root.bind("<F8>", lambda event: self.cancel_entrance_registration())
+        self.root.bind("<F11>", lambda event: self.allow_exit_vehicle())
+        self.root.bind("<F12>", lambda event: self.cancel_exit_registration())
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.root.attributes("-fullscreen", True)
