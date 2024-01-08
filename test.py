@@ -2,17 +2,9 @@ import sys
 sys.dont_write_bytecode = True
 import tkinter as tk
 from tkinter import ttk, messagebox
-import cv2
 from PIL import Image, ImageTk
-import json
 from database_func import parkdb
-import threading
-import time
-import datetime
-import serial
-import platform
-import os
-import signal
+import threading,  time, shutil,  datetime,  serial,  platform, os, signal,  json,  cv2
 
 def force_quit():
     pid = os.getpid()
@@ -20,7 +12,6 @@ def force_quit():
         os.system(f"taskkill /F /PID {pid}")
     else:
         os.kill(pid, signal.SIGKILL)
-
 
 class VideoFeed:
     def __init__(self, root, video_source=0):
@@ -204,6 +195,7 @@ class App:
         # END Section Nút XE RA
 
         self.is_entrance_enabled = True
+        self.entrance_snapshot_filename = None
         self.start_serial_thread()
         self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle())
         self.root.bind("<F8>", lambda event: self.cancel_entrance_registration())
@@ -217,6 +209,7 @@ class App:
     def allow_entrance_vehicle(self):
         # Thay sau
         print("Entrance vehicle allowed")
+        self.move_snapshot_to_logs()
         self.is_entrance_enabled = True  # Enable card updates
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
@@ -224,6 +217,8 @@ class App:
     def cancel_entrance_registration(self):
         # Thay sau
         print("Entrance registration canceled")
+        if self.entrance_snapshot_filename:
+                self.delete_snapshot()
         self.is_entrance_enabled = True  # Enable card updates
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
@@ -270,6 +265,18 @@ class App:
             # You may also reset other relevant information, e.g., timestamps
             self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
         else:
+            # Take a picture of the vehicle (get the frame from the video feed)
+            frame = self.entrance_video_feed.video_capture.read()[1]
+            # Save the image to a folder
+            try:
+                os.makedirs("temp", exist_ok=True)
+                timestamp = datetime.datetime.now().strftime('%d-%m-%y %H_%M_%S')
+                self.entrance_snapshot_filename = os.path.join("temp", f"{timestamp}.jpg")
+                cv2.imwrite(self.entrance_snapshot_filename, frame)
+                print("Image saved:", self.entrance_snapshot_filename)
+            except Exception as e:
+                print(f"Error saving image: {e}")
+
             self.is_entrance_enabled = False  # Enable card updates
             # Update the card labels with the new card data
             self.entrance_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
@@ -278,6 +285,28 @@ class App:
 
             # Schedule the next update after a delay (e.g., 1000 milliseconds)
             self.root.after(1000, self.update_card_labels, "")
+
+    def move_snapshot_to_logs(self):
+        # Move the snapshot to the "logs" folder and reset the temporary variable
+        if self.entrance_snapshot_filename:
+            logs_folder = "logs"
+            os.makedirs(logs_folder, exist_ok=True)
+            # Create a folder named with the file name (without extension)
+            filename_without_extension = os.path.splitext(os.path.basename(self.entrance_snapshot_filename))[0]
+            destination_folder = os.path.join(logs_folder, filename_without_extension)
+            os.makedirs(destination_folder, exist_ok=True)
+            # Move the snapshot to the folder
+            destination_filename = os.path.join(destination_folder, os.path.basename(self.entrance_snapshot_filename))
+            shutil.move(self.entrance_snapshot_filename, destination_filename)
+            self.entrance_snapshot_filename = None
+            print("Snapshot moved to logs folder.")
+
+    def delete_snapshot(self):
+        # Delete the snapshot if it exists and reset the temporary variable
+        if self.entrance_snapshot_filename:
+            os.remove(self.entrance_snapshot_filename)
+            self.entrance_snapshot_filename = None
+            print("Snapshot deleted.")
 
     def start_serial_thread(self):
         self.is_capturing = True
