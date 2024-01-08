@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 import cv2
 from PIL import Image, ImageTk
 import json
+import sqlite3
 
 class VideoFeed:
     def __init__(self, root, video_source=0):
@@ -74,11 +75,11 @@ class App:
 
         self.load_configuration()
 
-        entrance_frame = tk.Frame(self.root, bg="white")
+        entrance_frame = tk.Frame(self.root, highlightbackground="black", highlightthickness=1)
         entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         entrance_frame.pack_propagate(0)
 
-        exit_frame = tk.Frame(self.root, bg="white")
+        exit_frame = tk.Frame(self.root, highlightbackground="black", highlightthickness=1)
         exit_frame.pack(side="right", fill="both", expand=True, padx=5, pady=5)
         exit_frame.pack_propagate(0)
 
@@ -92,7 +93,7 @@ class App:
         self.exit_video_feed = VideoFeed(exit_frame, video_source=self.exit_camera)
 
         # Section Nút XE VÀO
-        entrance_button_frame = tk.Frame(entrance_frame)
+        entrance_button_frame = tk.Frame(entrance_frame, highlightbackground="black", highlightthickness=1)
         entrance_button_frame.pack(side="bottom", pady=5)
 
         entrance_allow_button = tk.Button(entrance_button_frame, text="CHO PHÉP XE VÀO (F7)", bg="blue", fg="white", font=("Arial", 14), command=self.allow_entrance_vehicle)
@@ -123,12 +124,12 @@ class App:
         entrance_card_frame = tk.Label(entrance_button_frame, text="Đọc thẻ NULL - Mã thẻ: XXX", bg="yellow", fg="black", font=("Arial Bold", 15))
         entrance_card_frame.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
-        config_button = tk.Button(entrance_button_frame, font=("Arial", 14), text="Cài đặt", command=self.open_config_window)
+        config_button = tk.Button(entrance_button_frame, font=("Arial", 14), bg="burlywood", fg="black", text="Cài đặt", command=self.open_config_window)
         config_button.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
         # END Section Nút XE VÀO
 
         # Section Nút XE RA
-        exit_button_frame = tk.Frame(exit_frame)
+        exit_button_frame = tk.Frame(exit_frame, highlightbackground="black", highlightthickness=1)
         exit_button_frame.pack(side="bottom", pady=5)
 
         exit_allow_button = tk.Button(exit_button_frame, text="CHO PHÉP XE RA (F11)", bg="blue", fg="white", font=("Arial", 14), command=self.allow_exit_vehicle)
