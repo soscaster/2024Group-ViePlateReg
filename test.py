@@ -6,6 +6,7 @@ import cv2
 from PIL import Image, ImageTk
 import json
 import sqlite3
+import threading
 
 class VideoFeed:
     def __init__(self, root, video_source=0):
@@ -15,26 +16,39 @@ class VideoFeed:
         self.video_feed_label = tk.Label(self.root)
         self.video_feed_label.pack(side="top", fill="both", expand=True)
 
-        self.update_video_feed()
+        self.start_capturing()
 
     def update_video_feed(self):
-        ret, frame = self.video_capture.read()
-        if ret:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            height, width, _ = frame.shape
-            new_width = (height * 16) // 9
-            if new_width < width:
-                start = (width - new_width) // 2
-                frame = frame[:, start:start+new_width]
-            else:
-                new_height = (width * 9) // 16
-                start = (height - new_height) // 2
-                frame = frame[start:start+new_height, :]
-            image = Image.fromarray(frame)
-            photo = ImageTk.PhotoImage(image)
-            self.video_feed_label.configure(image=photo)
-            self.video_feed_label.image = photo
+        try:
+            ret, frame = self.video_capture.read()
+            if ret:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                height, width, _ = frame.shape
+                new_width = (height * 16) // 9
+                if new_width < width:
+                    start = (width - new_width) // 2
+                    frame = frame[:, start:start+new_width]
+                else:
+                    new_height = (width * 9) // 16
+                    start = (height - new_height) // 2
+                    frame = frame[start:start+new_height, :]
+                image = Image.fromarray(frame)
+                photo = ImageTk.PhotoImage(image)
+                self.video_feed_label.configure(image=photo)
+                self.video_feed_label.image = photo
+        except Exception as e:
+            print(f"Error updating video feed: {e}")
         self.root.after(10, self.update_video_feed)
+
+    def start_capturing(self):
+        self.is_capturing = True
+        self.capture_thread = threading.Thread(target=self.update_video_feed)
+        self.capture_thread.start()
+
+    def stop_capturing(self):
+        self.is_capturing = False
+        self.capture_thread.join()
+        self.video_capture.release()
 
 class ConfigWindow:
     def __init__(self, root, app):
@@ -231,6 +245,8 @@ class App:
     def on_close(self):
         # Ask the user if they want to exit
         if messagebox.askyesno("Thoát", "Bạn có chắc chắn muốn thoát?"):
+            self.entrance_video_feed.stop_capturing()  # Stop capturing before closing
+            self.exit_video_feed.stop_capturing()
             self.save_configuration()
             self.root.destroy()
 
