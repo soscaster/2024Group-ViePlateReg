@@ -250,12 +250,12 @@ class App:
                     while True:
                         serial_output = ser.readline().decode().strip()
                         print("Serial Data:", serial_output)
-                        self.update_card_labels(serial_output)
+                        self.update_entrance_card_labels(serial_output)
                 except serial.SerialException as e:
                     print(f"Error reading serial data: {e}")
                 time.sleep(0.1)
 
-    def update_card_labels(self, card_data):
+    def update_entrance_card_labels(self, card_data):
         if not self.is_entrance_enabled:  # Check if entrance updates are enabled
             return
 
@@ -284,7 +284,7 @@ class App:
             self.entrance_time_label.config(text=f"Giờ vào: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
 
             # Schedule the next update after a delay (e.g., 1000 milliseconds)
-            self.root.after(1000, self.update_card_labels, "")
+            self.root.after(1000, self.update_entrance_card_labels, "")
 
     def move_snapshot_to_logs(self):
         # Move the snapshot to the "logs" folder and reset the temporary variable
