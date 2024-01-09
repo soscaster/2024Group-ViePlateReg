@@ -279,6 +279,8 @@ class App:
             # You may also reset other relevant information, e.g., timestamps
             self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
         else:
+            if card_data == "START!":
+                return
             # Take a picture of the vehicle (get the frame from the video feed)
             frame = self.entrance_video_feed.video_capture.read()[1]
             # Save the image to a folder
@@ -306,26 +308,32 @@ class App:
             self.root.after(1000, self.update_entrance_card_labels, "")
 
     def move_snapshot_to_logs(self):
-        # Move the snapshot to the "logs" folder and reset the temporary variable
-        if self.entrance_snapshot_filename:
-            logs_folder = "logs"
-            os.makedirs(logs_folder, exist_ok=True)
-            # Create a folder named with the file name (without extension)
-            filename_without_extension = os.path.splitext(os.path.basename(self.entrance_snapshot_filename))[0]
-            destination_folder = os.path.join(logs_folder, filename_without_extension)
-            os.makedirs(destination_folder, exist_ok=True)
-            # Move the snapshot to the folder
-            destination_filename = os.path.join(destination_folder, os.path.basename(self.entrance_snapshot_filename))
-            shutil.move(self.entrance_snapshot_filename, destination_filename)
-            self.entrance_snapshot_filename = None
-            print("Snapshot moved to logs folder.")
+        try:
+            # Move the snapshot to the "logs" folder and reset the temporary variable
+            if self.entrance_snapshot_filename:
+                logs_folder = "logs"
+                os.makedirs(logs_folder, exist_ok=True)
+                # Create a folder named with the file name (without extension)
+                filename_without_extension = os.path.splitext(os.path.basename(self.entrance_snapshot_filename))[0]
+                destination_folder = os.path.join(logs_folder, filename_without_extension)
+                os.makedirs(destination_folder, exist_ok=True)
+                # Move the snapshot to the folder
+                destination_filename = os.path.join(destination_folder, os.path.basename(self.entrance_snapshot_filename))
+                shutil.move(self.entrance_snapshot_filename, destination_filename)
+                self.entrance_snapshot_filename = None
+                print("Snapshot moved to logs folder.")
+        except Exception as e:
+            print(f"Error moving snapshot to logs folder: {e}")
 
     def delete_snapshot(self):
-        # Delete the snapshot if it exists and reset the temporary variable
-        if self.entrance_snapshot_filename:
-            os.remove(self.entrance_snapshot_filename)
-            self.entrance_snapshot_filename = None
-            print("Snapshot deleted.")
+        try:
+            # Delete the snapshot if it exists and reset the temporary variable
+            if self.entrance_snapshot_filename:
+                os.remove(self.entrance_snapshot_filename)
+                self.entrance_snapshot_filename = None
+                print("Snapshot deleted.")
+        except Exception as e:
+            print(f"Error deleting snapshot: {e}")
 
     def start_serial_thread(self):
         self.is_capturing = True
