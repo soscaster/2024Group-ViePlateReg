@@ -1,11 +1,9 @@
 import sqlite3
 from datetime import datetime
 
-
 def connect(db_name):
     c = sqlite3.connect(db_name)
     return c
-
 
 def create_card_tabel(db_name):
     c = connect(db_name)

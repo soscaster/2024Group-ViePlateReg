@@ -102,6 +102,12 @@ class App:
 
         self.load_configuration()
 
+        db = "parking.db"      
+        parkdb.connect(db)
+        parkdb.create_card_tabel(db)
+        parkdb.create_activity_table(db)
+        parkdb.create_log_table(db)
+
         entrance_frame = tk.Frame(self.root, highlightbackground="black", highlightthickness=1)
         entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         entrance_frame.pack_propagate(0)
