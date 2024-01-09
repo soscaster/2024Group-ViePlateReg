@@ -70,7 +70,19 @@ def check_card_exists(db_name, card_id):
     cur.execute("SELECT COUNT(*) FROM cards_info WHERE card_id = ?", (card_id,))
     count = cur.fetchone()[0]
     
-    if (count>0):
+    if (count):
+        return True
+    else:
+        return False
+    
+def check_card_active(db_name, card_id):
+    c = connect(db_name)
+    cur = c.cursor()
+    
+    cur.execute("SELECT COUNT(*) FROM parking_activity WHERE card_id = ?", (card_id,))
+    is_active = cur.fetchone()[0]
+    
+    if (is_active):
         return True
     else:
         return False
@@ -79,13 +91,26 @@ def check_card_exists(db_name, card_id):
 def insert_park_activity(db_name, activity_id, card_id):
     c = connect(db_name)
     cur = c.cursor()
-    
-    if (check_card_exists(db_name, card_id)):
+
+    if (check_card_active(db_name, card_id)):
+        print(f"Card with ID {card_id} is already active.")
+        return
+    else:
         cur.execute("INSERT INTO parking_activity VALUES (?, ?)", (activity_id, card_id))
         c.commit()
         print("Activity created successfully.")
+    c.close()
+
+def remove_park_activity(db_name, card_id):
+    c = connect(db_name)
+    cur = c.cursor()
+    
+    if (check_card_active(db_name, card_id)):
+        cur.execute("DELETE FROM parking_activity WHERE card_id = ?", (card_id,))
+        c.commit()
+        print("Activity deleted successfully.")
     else:
-        print(f"Card with ID {card_id} does not exist.")
+        print(f"Card with ID {card_id} is not active.")
     c.close()
             
 

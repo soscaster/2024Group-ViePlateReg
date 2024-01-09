@@ -109,6 +109,8 @@ class App:
 
         self.load_configuration()
 
+        self.card_data = None
+
         db = "parking.db"      
         parkdb.connect(db)
         parkdb.create_card_tabel(db)
@@ -136,7 +138,7 @@ class App:
         entrance_button_frame = tk.Frame(entrance_frame, highlightbackground="black", highlightthickness=1)
         entrance_button_frame.pack(side="bottom", pady=5)
 
-        entrance_allow_button = tk.Button(entrance_button_frame, text="CHO PHÉP XE VÀO (F7)", bg="blue", fg="white", font=("Arial", 14), command=self.allow_entrance_vehicle)
+        entrance_allow_button = tk.Button(entrance_button_frame, text="CHO PHÉP XE VÀO (F7)", bg="blue", fg="white", font=("Arial", 14), command= lambda: self.allow_entrance_vehicle(self.card_data))
         entrance_allow_button.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
 
         entrance_cancel_button = tk.Button(entrance_button_frame, text="HUỶ XE VÀO (F8)", bg="red", fg="white", font=("Arial", 14), command=self.cancel_entrance_registration)
@@ -174,7 +176,7 @@ class App:
         exit_button_frame = tk.Frame(exit_frame, highlightbackground="black", highlightthickness=1)
         exit_button_frame.pack(side="bottom", pady=5)
 
-        exit_allow_button = tk.Button(exit_button_frame, text="CHO PHÉP XE RA (F11)", bg="blue", fg="white", font=("Arial", 14), command=self.allow_exit_vehicle)
+        exit_allow_button = tk.Button(exit_button_frame, text="CHO PHÉP XE RA (F11)", bg="blue", fg="white", font=("Arial", 14), command=lambda: self.allow_exit_vehicle(self.card_data))
         exit_allow_button.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
         
         exit_cancel_button = tk.Button(exit_button_frame, text="HUỶ XE RA (F12)", bg="red", fg="white", font=("Arial", 14), command=self.cancel_exit_registration)
@@ -208,7 +210,7 @@ class App:
         exit_button.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
         # END Section Nút XE RA
 
-        self.is_entrance_enabled = True
+        self.is_reading_enabled = True
         self.entrance_snapshot_filename = None
         self.start_serial_thread()
         self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle())
@@ -219,31 +221,6 @@ class App:
 
         self.root.attributes("-fullscreen", True)
         self.root.resizable(False, False)
-
-    def allow_entrance_vehicle(self):
-        # Thay sau
-        print("Entrance vehicle allowed")
-        self.move_snapshot_to_logs()
-        self.is_entrance_enabled = True  # Enable card updates
-        self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
-        self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
-
-    def cancel_entrance_registration(self):
-        # Thay sau
-        print("Entrance registration canceled")
-        if self.entrance_snapshot_filename:
-                self.delete_snapshot()
-        self.is_entrance_enabled = True  # Enable card updates
-        self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
-        self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
-
-    def allow_exit_vehicle(self):
-        # Thay sau
-        print("Exit vehicle allowed")
-
-    def cancel_exit_registration(self):
-        # Thay sau
-        print("Exit registration canceled")
 
     def get_serial_ports(self):
         # Return a list of available serial ports
@@ -263,51 +240,125 @@ class App:
                     ser = serial.Serial(self.serial_port, baudrate=115200)
                     while True:
                         serial_output = ser.readline().decode().strip()
+                        self.card_data = serial_output
                         print("Serial Data:", serial_output)
-                        self.update_entrance_card_labels(serial_output)
+                        self.check_card(serial_output)
                 except serial.SerialException as e:
                     print(f"Error reading serial data: {e}")
                 time.sleep(0.1)
+    
+    # Read the card, use the parkdb to check if the card is exist or not, if yes then check if it's in the parking_activity or not. If no, run update_entrance_card_labels. If yes, run update_exit_card_labels
+    def check_card(self, card_data):
+        if not self.is_reading_enabled:  # Check if entrance updates are enabled
+            return
+        if card_data == "" or card_data == "START!":  # Assuming an empty string indicates the card has been removed
+            return
+        else:
+            if parkdb.check_card_exists("parking.db", card_data):
+                print("Card exists")
+                if parkdb.check_card_active("parking.db", card_data):
+                    print("Card is active")
+                    self.update_exit_card_labels(card_data)
+                    self.is_reading_enabled = False
+                else:
+                    print("Card is not active")
+                    self.update_entrance_card_labels(card_data)
+                    self.is_reading_enabled = False
+            else:
+                # Messagebox to notify that the card is not exist
+                messagebox.showerror("Lỗi", f"Thẻ {card_data} không tồn tại trong hệ thống!")
+
+    # Allow the vehicle to enter the parking lot (get card data from the card reader too)
+    def allow_entrance_vehicle(self, card_data):
+        self.move_entrance_snapshot_to_logs()
+        parkdb.insert_park_activity("parking.db", 1, card_data)
+        print("Entrance vehicle allowed")
+        self.is_reading_enabled = True  # Enable card updates
+        self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
+        self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+
+    def cancel_entrance_registration(self):
+        try:
+            if self.entrance_snapshot_filename:
+                self.delete_entrance_snapshot()
+                print("Snapshot deleted.")
+        except Exception as e:
+            print(f"Error deleting snapshot: {e}")
+        print("Entrance registration canceled")
+        self.is_reading_enabled = True  # Enable card updates
+        self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
+        self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+
+    def allow_exit_vehicle(self, card_data):
+        self.move_exit_snapshot_to_logs()
+        parkdb.remove_park_activity("parking.db", card_data)
+        print("Exit vehicle allowed")
+        self.is_reading_enabled = True  # Enable card updates
+        self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
+        self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+
+    def cancel_exit_registration(self):
+        try:
+            if self.exit_snapshot_filename:
+                self.delete_exit_snapshot()
+                print("Snapshot deleted.")
+        except Exception as e:
+            print(f"Error deleting snapshot: {e}")
+        print("Exit registration canceled")
+        self.is_reading_enabled = True  # Enable card updates
+        self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
+        self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+
 
     def update_entrance_card_labels(self, card_data):
-        if not self.is_entrance_enabled:  # Check if entrance updates are enabled
-            return
+        # Take a picture of the vehicle (get the frame from the video feed)
+        frame = self.entrance_video_feed.video_capture.read()[1]
+        # Save the image to a folder
+        try:
+            os.makedirs("temp", exist_ok=True)
+            timestamp = datetime.datetime.now().strftime('%d-%m-%y %H_%M_%S')
+            self.entrance_snapshot_filename = os.path.join("temp", f"{timestamp}_IN.jpg")
+            cv2.imwrite(self.entrance_snapshot_filename, frame)
+            print("Image saved:", self.entrance_snapshot_filename)
+        except Exception as e:
+            print(f"Error saving image: {e}")
 
-        if card_data == "":  # Assuming an empty string indicates the card has been removed
-            # Reset the card labels to their original state
-            self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
-            # You may also reset other relevant information, e.g., timestamps
-            self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
-        else:
-            if card_data == "START!":
-                return
-            # Take a picture of the vehicle (get the frame from the video feed)
-            frame = self.entrance_video_feed.video_capture.read()[1]
-            # Save the image to a folder
-            try:
-                os.makedirs("temp", exist_ok=True)
-                timestamp = datetime.datetime.now().strftime('%d-%m-%y %H_%M_%S')
-                self.entrance_snapshot_filename = os.path.join("temp", f"{timestamp}.jpg")
-                cv2.imwrite(self.entrance_snapshot_filename, frame)
-                print("Image saved:", self.entrance_snapshot_filename)
-            except Exception as e:
-                print(f"Error saving image: {e}")
+        self.is_reading_enabled = False
+        # Update the card labels with the new card data
+        self.entrance_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
+        # You may also update other relevant information, e.g., timestamps
+        self.entrance_time_label.config(text=f"Giờ vào: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
 
-            self.is_entrance_enabled = False  # Enable card updates
-            # Update the card labels with the new card data
-            self.entrance_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
-            # You may also update other relevant information, e.g., timestamps
-            self.entrance_time_label.config(text=f"Giờ vào: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
+        try:
+            ocr.extract_text(self.entrance_snapshot_filename)
+        except Exception as e:
+            print(f"Error extracting text: {e}")
 
-            try:
-                ocr.extract_text(self.entrance_snapshot_filename)
-            except Exception as e:
-                print(f"Error extracting text: {e}")
+    def update_exit_card_labels(self, card_data):
+        # Take a picture of the vehicle (get the frame from the video feed)
+        frame = self.exit_video_feed.video_capture.read()[1]
+        # Save the image to a folder
+        try:
+            os.makedirs("temp", exist_ok=True)
+            timestamp = datetime.datetime.now().strftime('%d-%m-%y %H_%M_%S')
+            self.exit_snapshot_filename = os.path.join("temp", f"{timestamp}_OUT.jpg")
+            cv2.imwrite(self.exit_snapshot_filename, frame)
+            print("Image saved:", self.exit_snapshot_filename)
+        except Exception as e:
+            print(f"Error saving image: {e}")
 
-            # Schedule the next update after a delay (e.g., 1000 milliseconds)
-            self.root.after(1000, self.update_entrance_card_labels, "")
+        self.is_reading_enabled = False
+        # Update the card labels with the new card data
+        self.exit_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
+        # You may also update other relevant information, e.g., timestamps
+        self.exit_time_label.config(text=f"Giờ ra: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
 
-    def move_snapshot_to_logs(self):
+        try:
+            ocr.extract_text(self.exit_snapshot_filename)
+        except Exception as e:
+            print(f"Error extracting text: {e}")
+
+    def move_entrance_snapshot_to_logs(self):
         try:
             # Move the snapshot to the "logs" folder and reset the temporary variable
             if self.entrance_snapshot_filename:
@@ -325,15 +376,43 @@ class App:
         except Exception as e:
             print(f"Error moving snapshot to logs folder: {e}")
 
-    def delete_snapshot(self):
+    def move_exit_snapshot_to_logs(self):
+        try:
+            # Move the snapshot to the "logs" folder and reset the temporary variable
+            if self.exit_snapshot_filename:
+                logs_folder = "logs"
+                os.makedirs(logs_folder, exist_ok=True)
+                # Create a folder named with the file name (without extension)
+                filename_without_extension = os.path.splitext(os.path.basename(self.exit_snapshot_filename))[0]
+                destination_folder = os.path.join(logs_folder, filename_without_extension)
+                os.makedirs(destination_folder, exist_ok=True)
+                # Move the snapshot to the folder
+                destination_filename = os.path.join(destination_folder, os.path.basename(self.exit_snapshot_filename))
+                shutil.move(self.exit_snapshot_filename, destination_filename)
+                self.exit_snapshot_filename = None
+                print("Snapshot moved to logs folder.")
+        except Exception as e:
+            print(f"Error moving snapshot to logs folder: {e}")
+
+    def delete_entrance_snapshot(self):
         try:
             # Delete the snapshot if it exists and reset the temporary variable
             if self.entrance_snapshot_filename:
                 os.remove(self.entrance_snapshot_filename)
                 self.entrance_snapshot_filename = None
-                print("Snapshot deleted.")
+                print("Entrance snapshot deleted.")
         except Exception as e:
-            print(f"Error deleting snapshot: {e}")
+            print(f"Error deleting entrance snapshot: {e}")
+
+    def delete_exit_snapshot(self):
+        try:
+            # Delete the snapshot if it exists and reset the temporary variable
+            if self.exit_snapshot_filename:
+                os.remove(self.exit_snapshot_filename)
+                self.exit_snapshot_filename = None
+                print("Exit snapshot deleted.")
+        except Exception as e:
+            print(f"Error deleting Exit snapshot: {e}")
 
     def start_serial_thread(self):
         self.is_capturing = True
