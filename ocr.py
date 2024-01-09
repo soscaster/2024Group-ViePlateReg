@@ -6,6 +6,11 @@ import cv2
 def extract_text(path):
 # loading images and resizing
     img = cv2.imread(path)
+    # Print path
+    print(f"OCR is reading from image: {path}")
+    # Print image details
+    print(f"Image shape: {img.shape}")
+    # Resize image
     img = cv2.resize(img, (800, 600))
 
     # load font
@@ -31,14 +36,15 @@ def extract_text(path):
 
     (x, y, w, h) = cv2.boundingRect(number_plate_shape)
     croped_img = grayscale[y:y + h, x:x + w]
+    cv2.imwrite("extracted.jpg", croped_img)
 
     reader = Reader(['en'])
     detection = reader.readtext(croped_img)
     plate = ' '.join(detect[1] for detect in detection) #read both line of plate
 
-    return plate, croped_img
+    return plate
 
-print(extract_text("test.jpg"))
+# print(extract_text("test.jpg"))
 
     # if len(detection) == 0:
     #     text = "Không thấy bảng số xe"

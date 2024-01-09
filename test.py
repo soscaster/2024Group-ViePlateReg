@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 from database_func import parkdb
+import ocr
 import threading,  time, shutil,  datetime,  serial,  platform, os, signal,  json,  cv2
 
 def force_quit():
@@ -282,6 +283,11 @@ class App:
             self.entrance_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
             # You may also update other relevant information, e.g., timestamps
             self.entrance_time_label.config(text=f"Giờ vào: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
+
+            try:
+                ocr.extract_text(self.entrance_snapshot_filename)
+            except Exception as e:
+                print(f"Error extracting text: {e}")
 
             # Schedule the next update after a delay (e.g., 1000 milliseconds)
             self.root.after(1000, self.update_entrance_card_labels, "")
