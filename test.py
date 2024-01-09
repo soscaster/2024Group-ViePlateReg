@@ -40,11 +40,11 @@ class VideoFeed:
                 new_width = (height * 16) // 9
                 if new_width < width:
                     start = (width - new_width) // 2
-                    frame = frame[:, start:start+new_width]
+                    frame = frame[:, start:start + new_width]
                 else:
                     new_height = (width * 9) // 16
                     start = (height - new_height) // 2
-                    frame = frame[start:start+new_height, :]
+                    frame = frame[start:start + new_height, :]
                 image = Image.fromarray(frame)
                 photo = ImageTk.PhotoImage(image)
                 self.video_feed_label.configure(image=photo)
