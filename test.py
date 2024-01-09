@@ -5,7 +5,14 @@ from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 from database_func import parkdb
 import ocr
-import threading,  time, shutil,  datetime,  serial,  platform, os, signal,  json,  cv2
+import threading,  time, shutil,  datetime,  serial,  platform, os, signal,  json,  cv2, subprocess
+
+if platform.system() == "Windows":
+    run_me = "python"
+elif platform.system() == "Linux":
+    run_me = "python3"
+else:
+    run_me = "python3"
 
 def force_quit():
     pid = os.getpid()

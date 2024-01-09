@@ -47,7 +47,21 @@ def insert_cards(db_name, id):
     cur.execute("INSERT INTO cards_info (card_id) VALUES (?)", (id,))
     c.commit()
     c.close()
+
+def remove_cards(db_name, id):
+    c = connect(db_name)
+    cur = c.cursor()
+    cur.execute("DELETE FROM cards_info WHERE card_id = ?", (id,))
+    c.commit()
+    c.close()
     
+def get_card_list(db_name):
+    c = connect(db_name)
+    cur = c.cursor()
+    cur.execute("SELECT card_id FROM cards_info;")
+    card_ids = cur.fetchall()
+    c.close()
+    return card_ids
 
 def check_card_exists(db_name, card_id):
     c = connect(db_name)
