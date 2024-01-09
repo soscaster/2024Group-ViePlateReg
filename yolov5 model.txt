@@ -1,0 +1,9 @@
+
+```
+# git clone yolov5
+cd 2024Group-ViePlateReg
+git clone https://github.com/Marsmallotr/License-Plate-Recognition.git
+
+```
+or download older version of yolov5 in this link and extract .zip into this folder
+https://drive.google.com/file/d/1g1u7M4NmWDsMGOppHocgBKjbwtDA-uIu/view?usp=sharing
