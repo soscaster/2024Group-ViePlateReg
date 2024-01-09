@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 from database_func import parkdb
 import ocr
-import threading,  time, shutil,  datetime,  serial,  platform, os, signal,  json,  cv2, subprocess
+import threading, sqlite3, time, shutil,  datetime, serial, platform, os, signal,  json,  cv2, subprocess
 
 if platform.system() == "Windows":
     run_me = "python"
@@ -31,7 +31,7 @@ class VideoFeed:
 
         self.start_capturing()
 
-    def update_video_feed(self):
+    def update_video_feed(self, is_capturing_variable):
         try:
             ret, frame = self.video_capture.read()
             if ret:
@@ -51,16 +51,21 @@ class VideoFeed:
                 self.video_feed_label.image = photo
         except Exception as e:
             print(f"Error updating video feed: {e}")
-        self.root.after(10, self.update_video_feed)
+        if getattr(self, is_capturing_variable):
+            self.root.after(10, self.update_video_feed(is_capturing_variable))
 
     def start_capturing(self):
-        self.is_capturing = True
-        self.capture_thread = threading.Thread(target=self.update_video_feed)
-        self.capture_thread.start()
+        is_capturing_variable = f'is_capturing_{self.video_source}'
+        setattr(self, is_capturing_variable, True)
+        capture_thread = threading.Thread(target=self.update_video_feed, args=(is_capturing_variable,))
+        setattr(self, f'capture_thread_{self.video_source}', capture_thread)
+        capture_thread.start()
 
     def stop_capturing(self):
-        self.is_capturing = False
-        self.capture_thread.join()
+        is_capturing_variable = f'is_capturing_{self.video_source}'
+        setattr(self, is_capturing_variable, False)
+        capture_thread = getattr(self, f'capture_thread_{self.video_source}')
+        capture_thread.join(timeout=0.5) 
         self.video_capture.release()
 
 class ConfigWindow:
@@ -100,6 +105,100 @@ class ConfigWindow:
         }
 
         self.app.apply_configuration(config)
+        self.restart_confirmation_window = tk.Toplevel(self.root)
+        label = tk.Label(self.restart_confirmation_window, text="Vui lòng thoát ứng dụng và vào lại để áp dụng tuỳ chọn mới.")
+        label.pack(padx=20, pady=20)
+        self.root.after(2000, self.root.destroy)
+
+class allowEntranceVehicleWindow:
+    def __init__(self, root, entrance_camera):
+        self.root = root
+        self.entrance_camera = entrance_camera
+        self.root.title("Modify Logs")
+        # self.root.geometry("800x600")
+
+        # Label to display captured image
+        self.image_label = tk.Label(self.root)
+        self.image_label.pack(pady=10)
+
+        #get current date and time
+        dateatime = datetime.datetime.now().strftime("%d-%m-%Y_%H:%M")
+        #OCR result
+        OCR_result = "ExampleOCR"
+        #card id
+        card_id = "ExampleCardID"
+
+       # StringVar variables
+        self.cu_card_id = tk.StringVar()
+        self.cu_dateatime = tk.StringVar()
+        self.cu_OCR_result = tk.StringVar()
+        
+        # Capture an image from the entrance camera
+        image = self.capture_image()
+
+        self.photo = ImageTk.PhotoImage(image)
+        self.image_label.configure(image=self.photo)
+        self.image_label.image = self.photo
+
+        # Create labels
+        lbl_card_id = tk.Label(self.root, text="Card ID", font=("Arial", 15))
+        lbl_ocr_output = tk.Label(self.root, text="OCR Output", font=("Arial", 15))
+        lbl_time_in = tk.Label(self.root, text="Time In", font=("Arial", 15))
+        # Create entry boxes   
+        self.ent_card_id = tk.Entry(self.root, width=43, textvariable=self.cu_card_id, font=("Arial", 13), relief='flat', borderwidth=0, fg='firebrick1', highlightthickness=0, justify="left")
+        self.ent_ocr_output = tk.Entry(self.root, width=43, textvariable=self.cu_OCR_result, font=("Arial", 13), relief='flat', borderwidth=0, fg='firebrick1', highlightthickness=0, justify="left")
+        self.ent_time_in = tk.Entry(self.root, width=43, textvariable=self.cu_dateatime, font=("Arial", 13), relief='flat', borderwidth=0, fg='firebrick1', highlightthickness=0, justify="left")
+
+        # Set default values
+        self.ent_card_id.insert(0, card_id)
+        self.ent_ocr_output.insert(0, OCR_result)
+        self.ent_time_in.insert(0, dateatime)
+        
+        # Create buttons
+        ok_button = tk.Button(self.root, text="OK", command=lambda: self.on_ok(image))
+        cancel_button = tk.Button(self.root, text="Cancel", command=self.on_cancel)
+
+        # Pack labels, entry boxes, buttons
+        lbl_card_id.pack()
+        self.ent_card_id .pack()
+        lbl_ocr_output.pack()
+        self.ent_ocr_output.pack()
+        lbl_time_in.pack()
+        self.ent_time_in.pack()
+        ok_button.pack(side="left", padx=10, pady=10)
+        cancel_button.pack(side="right", padx=10, pady=10)
+
+    def capture_image(self):
+        # Capture an image from the entrance camera
+        cap = cv2.VideoCapture(self.entrance_camera)
+        ret, frame = cap.read()
+        cap.release()
+        if ret:
+            # Convert the image from BGR to RGB
+            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Resize the image to fit the label
+            image = Image.fromarray(rgb_image)
+            image = image.resize((400, 300))
+            return image
+        else:
+            # Return a default image if capturing fails
+            return Image.new("RGB", (400, 300), (255, 255, 255))
+
+    def on_ok(self, image):
+        # Process the modifications (to be implemented)
+        card_id = self.cu_card_id.get()
+        dateatime = self.cu_dateatime.get()
+        OCR_result = self.cu_OCR_result.get()
+        try:
+            if messagebox.askyesno("Xác nhận", "Bạn có chắc chắn thông tin đúng?"):
+                image_filename = f"{dateatime}_{OCR_result}.jpg"
+                image.save(image_filename)
+                parkdb.insert_log("parking.db", 1, card_id, image_filename, OCR_result)
+                self.root.destroy()
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Đã xảy ra lỗi: {e}")
+
+    def on_cancel(self):
         self.root.destroy()
 
 class App:
@@ -222,11 +321,12 @@ class App:
 
     def allow_entrance_vehicle(self):
         # Thay sau
-        print("Entrance vehicle allowed")
         self.move_snapshot_to_logs()
         self.is_entrance_enabled = True  # Enable card updates
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        Allow_entrance_vehicle_window = tk.Toplevel(self.root)
+        allowEntranceVehicleWindow(Allow_entrance_vehicle_window, self.entrance_camera)
 
     def cancel_entrance_registration(self):
         # Thay sau
@@ -383,7 +483,6 @@ class App:
     def on_close(self):
         # Ask the user if they want to exit
         if messagebox.askyesno("Thoát", "Bạn có chắc chắn muốn thoát?"):
-            self.is_capturing = False  # Stop the serial data reading thread
             self.entrance_video_feed.stop_capturing()  # Stop capturing before closing
             self.exit_video_feed.stop_capturing()
             self.save_configuration()
