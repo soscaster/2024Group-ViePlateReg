@@ -136,10 +136,19 @@ class App:
         entrance_frame = tk.Frame(self.root, highlightbackground="black", highlightthickness=1)
         entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         entrance_frame.pack_propagate(0)
+        self.entrance_frame = entrance_frame
 
         exit_frame = tk.Frame(self.root, highlightbackground="black", highlightthickness=1)
         exit_frame.pack(side="right", fill="both", expand=True, padx=5, pady=5)
         exit_frame.pack_propagate(0)
+        self.exit_frame = exit_frame
+
+        # Create a new image frame for exit
+        exit_image_frame = tk.Frame(self.root)
+        exit_image_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        exit_image_frame.pack_propagate(0)
+        self.exit_image_frame = exit_image_frame
+        self.exit_image_frame.pack_forget()
 
         entrance_label = tk.Label(entrance_frame, text="LUỒNG XE VÀO", bg="yellow", font=("Arial", 18))
         entrance_label.pack(side="top", fill="both", expand=True)
@@ -246,6 +255,9 @@ class App:
 
         self.is_reading_enabled = True
         self.entrance_snapshot_filename = None
+        self.entrance_destination_path = None
+        self.exit_snapshot_filename = None
+        self.exit_destination_path = None
         self.entrance_timestamp = None
         self.exit_timestamp = None
         self.start_serial_thread()
@@ -309,8 +321,7 @@ class App:
         self.move_entrance_snapshot_to_logs()
         parkdb.insert_park_activity("parking.db", 1, card_data)
         parkdb.update_cards_status("parking.db", card_data)
-        print(f"{self.entrance_timestamp} - {card_data} - {self.entrance_snapshot_filename} - {self.entrance_ocr_label.cget('text')}")
-        parkdb.insert_log("parking.db", self.entrance_timestamp, card_data, self.entrance_snapshot_filename, self.entrance_ocr_label.cget("text"))
+        parkdb.insert_log("parking.db", self.entrance_timestamp, card_data, self.entrance_destination_path, self.entrance_ocr_label.cget("text"))
         self.entrance_snapshot_filename = None
         print("Entrance vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
@@ -336,7 +347,7 @@ class App:
     def allow_exit_vehicle(self, card_data):
         self.move_exit_snapshot_to_logs()
         parkdb.delete_parking_activity("parking.db", card_data)
-        parkdb.update_log_exit("parking.db", self.exit_timestamp, card_data, self.exit_snapshot_filename)
+        parkdb.update_log_exit("parking.db", self.exit_timestamp, card_data, self.exit_destination_path)
         self.exit_snapshot_filename = None
         print("Exit vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
@@ -346,6 +357,8 @@ class App:
         self.exit_result_label.config(text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white")
         # Restore the old ocr
         self.restore_exit_result_frame()
+        self.exit_image_frame.pack_forget()
+        self.entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
     def cancel_exit_registration(self):
         try:
@@ -362,6 +375,8 @@ class App:
         self.exit_result_label.config(text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white")
         # Restore the old ocr
         self.restore_exit_result_frame()
+        self.exit_image_frame.pack_forget()
+        self.entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
     def restore_exit_result_frame(self):
         self.ocr_exit_result_frame = self.old_exit_result_frame
@@ -453,6 +468,23 @@ class App:
             image_label.image = resized_photo
             image_label.pack(fill="both", expand=True)
 
+            # Load lb_img_in from database
+            lp_img_in = parkdb.get_log_image_in("parking.db", card_data)
+            if lp_img_in:
+                loaded_image = Image.open(lp_img_in)
+                # loaded_image = loaded_image.resize((self.entrance_frame.winfo_width() // 2, self.entrance_frame.winfo_height()))
+                loaded_photo = ImageTk.PhotoImage(loaded_image)
+
+                for widget in self.exit_image_frame.winfo_children():
+                    widget.destroy()
+
+                self.entrance_frame.pack_forget()
+                self.exit_image_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+                image_label = tk.Label(self.exit_image_frame, image=loaded_photo)
+                image_label.image = loaded_photo
+                # Stretch the image to fill the frame
+                image_label.pack(fill="both", expand=True)
+
         except Exception as e:
             print(f"Error extracting Exit text or displaying image: {e}")
 
@@ -475,6 +507,8 @@ class App:
                 os.makedirs(destination_folder, exist_ok=True)
                 # Move the snapshot to the folder
                 destination_filename = os.path.join(destination_folder, os.path.basename(self.entrance_snapshot_filename))
+                self.entrance_destination_path = destination_filename
+                print("Destination path:", self.entrance_destination_path)
                 shutil.move(self.entrance_snapshot_filename, destination_filename)
                 # Move the extracted image to the folder
                 extracted_image_path = "temp/extracted.jpg"
@@ -497,6 +531,8 @@ class App:
                 # Move the snapshot to the folder
                 destination_filename = os.path.join(destination_folder, os.path.basename(self.exit_snapshot_filename))
                 shutil.move(self.exit_snapshot_filename, destination_filename)
+                self.exit_destination_path = destination_filename
+                print("Destination path:", self.exit_destination_path)
                 # Move the extracted image to the folder
                 extracted_image_path = "temp/extracted.jpg"
                 destination_extracted_image_path = os.path.join(destination_folder, os.path.basename(extracted_image_path))

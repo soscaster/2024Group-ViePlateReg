@@ -142,6 +142,14 @@ def get_log_ocr_output(db_name, card_id):
     ocr_output = cur.fetchone()[0]
     c.close()
     return ocr_output
+
+def get_log_image_in(db_name, card_id):
+    c = connect(db_name)
+    cur = c.cursor()
+    cur.execute("SELECT lp_img_in FROM logs WHERE card_id = ? AND time_out IS NULL", (card_id,))
+    lp_img_in = cur.fetchone()[0]
+    c.close()
+    return lp_img_in
     
 def update_log_exit(db_name, time_out, card_id, lp_img_out):
     c = connect(db_name)
