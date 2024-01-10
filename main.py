@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 from database_func import parkdb
 import ocr
-import threading,  time, shutil,  datetime,  serial,  platform, os, signal,  json,  cv2, subprocess
+import threading,  time, shutil,  datetime, serial,  platform, os, signal,  json,  cv2, subprocess
 
 if platform.system() == "Windows":
     run_me = "python"
@@ -21,20 +21,38 @@ def force_quit():
     else:
         os.kill(pid, signal.SIGKILL)
 
-class VideoFeed:
-    def __init__(self, root, video_source=0):
+class VideoGet:
+    def __init__(self, source=0):
+        self.stream = cv2.VideoCapture(source)
+        (self.grabbed, self.frame) = self.stream.read()
+        self.stopped = False
+
+    def start(self):    
+        threading.Thread(target=self.get, args=()).start()
+        return self
+
+    def get(self):
+        while not self.stopped:
+            if not self.grabbed:
+                self.stop()
+            else:
+                (self.grabbed, self.frame) = self.stream.read()
+
+    def stop(self):
+        self.stopped = True
+        self.stream.release()
+
+class VideoShow:
+    def __init__(self, root, video_getter):
         self.root = root
-        self.video_source = video_source
-        self.video_capture = cv2.VideoCapture(self.video_source)
+        self.video_getter = video_getter
         self.video_feed_label = tk.Label(self.root)
         self.video_feed_label.pack(side="top", fill="both", expand=True)
 
-        self.start_capturing()
-
     def update_video_feed(self):
         try:
-            ret, frame = self.video_capture.read()
-            if ret:
+            frame = self.video_getter.frame
+            if frame is not None:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 height, width, _ = frame.shape
                 new_width = (height * 16) // 9
@@ -53,15 +71,13 @@ class VideoFeed:
             print(f"Error updating video feed: {e}")
         self.root.after(10, self.update_video_feed)
 
-    def start_capturing(self):
-        self.is_capturing = True
-        self.capture_thread = threading.Thread(target=self.update_video_feed)
-        self.capture_thread.start()
+    def start_showing(self):
+        self.show_thread = threading.Thread(target=self.update_video_feed)
+        self.show_thread.start()
 
-    def stop_capturing(self):
-        self.is_capturing = False
-        self.capture_thread.join()
-        self.video_capture.release()
+    def stop_showing(self):
+        self.video_getter.stop()
+        self.show_thread.join()
 
 class ConfigWindow:
     def __init__(self, root, app):
@@ -131,8 +147,19 @@ class App:
         exit_label = tk.Label(exit_frame, text="LUỒNG XE RA", bg="yellow", font=("Arial", 18))
         exit_label.pack(side="top", fill="both", expand=True)
 
-        self.entrance_video_feed = VideoFeed(entrance_frame, video_source=self.entrance_camera)
-        self.exit_video_feed = VideoFeed(exit_frame, video_source=self.exit_camera)
+        # Video feed for entrance
+        entrance_video_getter = VideoGet(source=self.entrance_camera)
+        entrance_video_show = VideoShow(entrance_frame, entrance_video_getter)
+        entrance_video_getter.start()
+        entrance_video_show.start_showing()
+        self.entrance_video_feed = entrance_video_getter
+
+        # Video feed for exit
+        exit_video_getter = VideoGet(source=self.exit_camera)
+        exit_video_show = VideoShow(exit_frame, exit_video_getter)
+        exit_video_getter.start()
+        exit_video_show.start_showing()
+        self.exit_video_feed = exit_video_getter
 
         # Section Nút XE VÀO
         entrance_button_frame = tk.Frame(entrance_frame, highlightbackground="black", highlightthickness=1)
@@ -150,6 +177,7 @@ class App:
 
         entrance_ocr_label = tk.Label(entrance_button_frame, text="DDDL-DDDDD", bg="yellow", fg="red", font=("Arial Bold", 27))
         entrance_ocr_label.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
+        self.entrance_ocr_label = entrance_ocr_label
 
         entrance_time_label = tk.Label(entrance_button_frame, text="Giờ vào: DD/MM/YY HH:MM", bg="aqua", fg="black", font=("Arial", 14))
         entrance_time_label.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
@@ -188,6 +216,7 @@ class App:
 
         exit_ocr_label = tk.Label(exit_button_frame, text="DDDL-DDDDD", bg="yellow", fg="red", font=("Arial Bold", 27))
         exit_ocr_label.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
+        self.exit_ocr_label = exit_ocr_label
 
         exit_time_label = tk.Label(exit_button_frame, text="Giờ ra: DD/MM/YY HH:MM", bg="aqua", fg="black", font=("Arial", 14))
         exit_time_label.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
@@ -213,9 +242,9 @@ class App:
         self.is_reading_enabled = True
         self.entrance_snapshot_filename = None
         self.start_serial_thread()
-        self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle())
+        self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle(self.card_data))
         self.root.bind("<F8>", lambda event: self.cancel_entrance_registration())
-        self.root.bind("<F11>", lambda event: self.allow_exit_vehicle())
+        self.root.bind("<F11>", lambda event: self.allow_exit_vehicle(self.card_data))
         self.root.bind("<F12>", lambda event: self.cancel_exit_registration())
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -274,6 +303,7 @@ class App:
         parkdb.insert_park_activity("parking.db", 1, card_data)
         print("Entrance vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
+        self.entrance_ocr_label.config(text="DDDL-DDDDD")
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
 
@@ -286,6 +316,7 @@ class App:
             print(f"Error deleting snapshot: {e}")
         print("Entrance registration canceled")
         self.is_reading_enabled = True  # Enable card updates
+        self.entrance_ocr_label.config(text="DDDL-DDDDD")
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
 
@@ -294,6 +325,7 @@ class App:
         parkdb.remove_park_activity("parking.db", card_data)
         print("Exit vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
+        self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
 
@@ -306,13 +338,14 @@ class App:
             print(f"Error deleting snapshot: {e}")
         print("Exit registration canceled")
         self.is_reading_enabled = True  # Enable card updates
+        self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
 
 
     def update_entrance_card_labels(self, card_data):
         # Take a picture of the vehicle (get the frame from the video feed)
-        frame = self.entrance_video_feed.video_capture.read()[1]
+        frame = self.entrance_video_feed.stream.read()[1]
         # Save the image to a folder
         try:
             os.makedirs("temp", exist_ok=True)
@@ -323,20 +356,23 @@ class App:
         except Exception as e:
             print(f"Error saving image: {e}")
 
+        try:
+            # The result is a list, so we need to pick the first result of the list only
+            ocr_entrance_result = ocr.extract_text(self.entrance_snapshot_filename)
+            print("OCR result:", ocr_entrance_result)
+            self.entrance_ocr_label.config(text=ocr_entrance_result)
+        except Exception as e:
+            print(f"Error extracting Entrance text: {e}")
+
         self.is_reading_enabled = False
         # Update the card labels with the new card data
         self.entrance_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
         # You may also update other relevant information, e.g., timestamps
         self.entrance_time_label.config(text=f"Giờ vào: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
 
-        try:
-            ocr.extract_text(self.entrance_snapshot_filename)
-        except Exception as e:
-            print(f"Error extracting text: {e}")
-
     def update_exit_card_labels(self, card_data):
         # Take a picture of the vehicle (get the frame from the video feed)
-        frame = self.exit_video_feed.video_capture.read()[1]
+        frame = self.exit_video_feed.stream.read()[1]
         # Save the image to a folder
         try:
             os.makedirs("temp", exist_ok=True)
@@ -347,16 +383,18 @@ class App:
         except Exception as e:
             print(f"Error saving image: {e}")
 
+        try:
+            ocr_exit_result = ocr.extract_text(self.exit_snapshot_filename)
+            print("OCR result:", ocr_exit_result)
+            self.exit_ocr_label.config(text=ocr_exit_result)
+        except Exception as e:
+            print(f"Error extracting Exit text: {e}")
+
         self.is_reading_enabled = False
         # Update the card labels with the new card data
         self.exit_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
         # You may also update other relevant information, e.g., timestamps
         self.exit_time_label.config(text=f"Giờ ra: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
-
-        try:
-            ocr.extract_text(self.exit_snapshot_filename)
-        except Exception as e:
-            print(f"Error extracting text: {e}")
 
     def move_entrance_snapshot_to_logs(self):
         try:
@@ -470,9 +508,6 @@ class App:
     def on_close(self):
         # Ask the user if they want to exit
         if messagebox.askyesno("Thoát", "Bạn có chắc chắn muốn thoát?"):
-            self.is_capturing = False  # Stop the serial data reading thread
-            self.entrance_video_feed.stop_capturing()  # Stop capturing before closing
-            self.exit_video_feed.stop_capturing()
             self.save_configuration()
             self.root.destroy()
             force_quit()

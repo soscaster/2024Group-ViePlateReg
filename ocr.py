@@ -46,6 +46,8 @@
 #         return plate
 #     except:
 #         return "Không thấy bảng số xe"
+import sys
+sys.dont_write_bytecode = True
 from PIL import Image
 import cv2
 import torch
@@ -101,9 +103,9 @@ def extract_text(path):
                             break
                     if flag == 1:
                         break
-        return list_read_plates # return list of plates
+        return list_read_plates.pop() if list_read_plates else "Không thấy biển số"
     except:
-        return "Không thấy bảng số xe"
+        return "Không thấy biển số"
                 
 ############ Web cam ref code ############
 # # load model
