@@ -213,8 +213,9 @@ class App:
         exit_cancel_button.grid(row=4, column=0, padx=5, pady=5, sticky="ew")
 
         # 3 dòng kết quả nhận diện xe ra
-        exit_result_label = tk.Label(exit_button_frame, text="KẾT QUẢ XE RA TRÙNG KHỚP", bg="green", fg="white", font=("Arial Bold", 14))
+        exit_result_label = tk.Label(exit_button_frame, text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white", font=("Arial Bold", 14))
         exit_result_label.grid(row=0, column=1, padx=15, pady=5, sticky="ew")
+        self.exit_result_label = exit_result_label
 
         exit_ocr_label = tk.Label(exit_button_frame, text="DDDL-DDDDD", bg="yellow", fg="red", font=("Arial Bold", 27))
         exit_ocr_label.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
@@ -245,6 +246,8 @@ class App:
 
         self.is_reading_enabled = True
         self.entrance_snapshot_filename = None
+        self.entrance_timestamp = None
+        self.exit_timestamp = None
         self.start_serial_thread()
         self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle(self.card_data))
         self.root.bind("<F8>", lambda event: self.cancel_entrance_registration())
@@ -305,6 +308,10 @@ class App:
     def allow_entrance_vehicle(self, card_data):
         self.move_entrance_snapshot_to_logs()
         parkdb.insert_park_activity("parking.db", 1, card_data)
+        parkdb.update_cards_status("parking.db", card_data)
+        print(f"{self.entrance_timestamp} - {card_data} - {self.entrance_snapshot_filename} - {self.entrance_ocr_label.cget('text')}")
+        parkdb.insert_log("parking.db", self.entrance_timestamp, card_data, self.entrance_snapshot_filename, self.entrance_ocr_label.cget("text"))
+        self.entrance_snapshot_filename = None
         print("Entrance vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
         self.entrance_ocr_label.config(text="DDDL-DDDDD")
@@ -328,12 +335,15 @@ class App:
 
     def allow_exit_vehicle(self, card_data):
         self.move_exit_snapshot_to_logs()
-        parkdb.remove_park_activity("parking.db", card_data)
+        parkdb.delete_parking_activity("parking.db", card_data)
+        parkdb.update_log_exit("parking.db", self.exit_timestamp, card_data, self.exit_snapshot_filename)
+        self.exit_snapshot_filename = None
         print("Exit vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
         self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.exit_result_label.config(text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white")
         # Restore the old ocr
         self.restore_exit_result_frame()
 
@@ -349,6 +359,7 @@ class App:
         self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.exit_result_label.config(text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white")
         # Restore the old ocr
         self.restore_exit_result_frame()
 
@@ -401,6 +412,7 @@ class App:
         self.entrance_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
         # You may also update other relevant information, e.g., timestamps
         self.entrance_time_label.config(text=f"Giờ vào: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
+        self.entrance_timestamp = datetime.datetime.now().strftime('%d/%m/%y %H:%M:%S')
 
     def update_exit_card_labels(self, card_data):
         # Take a picture of the vehicle (get the frame from the video feed)
@@ -418,6 +430,10 @@ class App:
         try:
             ocr_exit_result = ocr.extract_text(self.exit_snapshot_filename)
             print("OCR result:", ocr_exit_result)
+            if ocr_exit_result == parkdb.get_log_ocr_output("parking.db", card_data):
+                self.exit_result_label.config(text="KẾT QUẢ XE RA TRÙNG KHỚP", bg="green")
+            else:
+                self.exit_result_label.config(text="KẾT QUẢ XE RA KHÔNG KHỚP", bg="red", fg="white")
             self.exit_ocr_label.config(text=ocr_exit_result)
             # Insert image temp/extracted.jpg to ocr_exit_result_frame
             extracted_image_path = "temp/extracted.jpg"
@@ -445,6 +461,7 @@ class App:
         self.exit_card_label.config(text=f"Đọc thẻ OK - Mã thẻ: {card_data}")
         # You may also update other relevant information, e.g., timestamps
         self.exit_time_label.config(text=f"Giờ ra: {datetime.datetime.now().strftime('%d/%m/%y %H:%M')}")
+        self.exit_timestamp = datetime.datetime.now().strftime('%d/%m/%y %H:%M:%S')
 
     def move_entrance_snapshot_to_logs(self):
         try:
@@ -463,7 +480,6 @@ class App:
                 extracted_image_path = "temp/extracted.jpg"
                 destination_extracted_image_path = os.path.join(destination_folder, os.path.basename(extracted_image_path))
                 shutil.move(extracted_image_path, destination_extracted_image_path)
-                self.entrance_snapshot_filename = None
                 print("Snapshot moved to logs folder.")
         except Exception as e:
             print(f"Error moving snapshot to logs folder: {e}")
@@ -485,7 +501,6 @@ class App:
                 extracted_image_path = "temp/extracted.jpg"
                 destination_extracted_image_path = os.path.join(destination_folder, os.path.basename(extracted_image_path))
                 shutil.move(extracted_image_path, destination_extracted_image_path)
-                self.exit_snapshot_filename = None
                 print("Snapshot moved to logs folder.")
         except Exception as e:
             print(f"Error moving snapshot to logs folder: {e}")

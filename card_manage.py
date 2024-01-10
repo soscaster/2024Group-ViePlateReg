@@ -20,7 +20,11 @@ class CardDatabaseWindow:
         self.root.geometry("400x350")
 
         self.load_configuration()
-        db = "parking.db"
+        db = "parking.db"      
+        parkdb.connect(db)
+        parkdb.create_card_tabel(db)
+        parkdb.create_activity_table(db)
+        parkdb.create_log_table(db)
 
         frame = tk.Frame(self.root, highlightbackground="black", highlightthickness=1)
         frame.pack(fill="both", expand=True)
