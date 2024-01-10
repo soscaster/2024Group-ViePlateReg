@@ -158,12 +158,19 @@ def update_log_exit(db_name, time_out, card_id, lp_img_out):
     if check_card_exists(db_name, card_id):
         # Select from logs table where card_id = card_id and time_out = null
         cur.execute("SELECT COUNT(*) FROM logs WHERE card_id = ? AND time_out IS NULL", (card_id,))
-        cur.execute("UPDATE logs SET time_out = ?, lp_img_out = ? WHERE card_id = ?", (time_out, lp_img_out, card_id))
-        c.commit()
-        print("Log updated successfully.")
+        count = cur.fetchone()[0]
+
+        if count > 0:
+            cur.execute("UPDATE logs SET time_out = ?, lp_img_out = ? WHERE card_id = ? AND time_out IS NULL", (time_out, lp_img_out, card_id))
+            c.commit()
+            print("Log updated successfully.")
+        else:
+            print(f"No active log entry found for card with ID {card_id}.")
     else:
         print(f"Card with ID {card_id} does not exist.")
+
     c.close()
+
 
 
 # db = "parking.db"        

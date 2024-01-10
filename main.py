@@ -256,9 +256,9 @@ class App:
         self.is_reading_enabled = True
         self.entrance_snapshot_filename = None
         self.entrance_destination_path = None
+        self.entrance_timestamp = None
         self.exit_snapshot_filename = None
         self.exit_destination_path = None
-        self.entrance_timestamp = None
         self.exit_timestamp = None
         self.start_serial_thread()
         self.root.bind("<F7>", lambda event: self.allow_entrance_vehicle(self.card_data))
@@ -321,6 +321,7 @@ class App:
         self.move_entrance_snapshot_to_logs()
         parkdb.insert_park_activity("parking.db", 1, card_data)
         parkdb.update_cards_status("parking.db", card_data)
+        print(f"{self.entrance_timestamp} - {card_data} - {self.entrance_destination_path}")
         parkdb.insert_log("parking.db", self.entrance_timestamp, card_data, self.entrance_destination_path, self.entrance_ocr_label.cget("text"))
         self.entrance_snapshot_filename = None
         print("Entrance vehicle allowed")
@@ -328,6 +329,7 @@ class App:
         self.entrance_ocr_label.config(text="DDDL-DDDDD")
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.entrance_timestamp = None
         self.restore_entrance_result_frame()
 
     def cancel_entrance_registration(self):
@@ -342,23 +344,26 @@ class App:
         self.entrance_ocr_label.config(text="DDDL-DDDDD")
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.entrance_timestamp = None
         self.restore_entrance_result_frame()
 
     def allow_exit_vehicle(self, card_data):
         self.move_exit_snapshot_to_logs()
         parkdb.delete_parking_activity("parking.db", card_data)
+        print(f"{self.exit_timestamp} - {card_data} - {self.exit_destination_path}")
         parkdb.update_log_exit("parking.db", self.exit_timestamp, card_data, self.exit_destination_path)
         self.exit_snapshot_filename = None
         print("Exit vehicle allowed")
         self.is_reading_enabled = True  # Enable card updates
         self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
-        self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.exit_time_label.config(text="Giờ ra: DD/MM/YY HH:MM")
         self.exit_result_label.config(text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white")
         # Restore the old ocr
         self.restore_exit_result_frame()
         self.exit_image_frame.pack_forget()
         self.entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        self.exit_timestamp = None
 
     def cancel_exit_registration(self):
         try:
@@ -371,12 +376,13 @@ class App:
         self.is_reading_enabled = True  # Enable card updates
         self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
-        self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.exit_time_label.config(text="Giờ ra: DD/MM/YY HH:MM")
         self.exit_result_label.config(text="KẾT QUẢ XE RA ĐANG ĐỢI", bg="blue", fg="white")
         # Restore the old ocr
         self.restore_exit_result_frame()
         self.exit_image_frame.pack_forget()
         self.entrance_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        self.exit_timestamp = None
 
     def restore_exit_result_frame(self):
         self.ocr_exit_result_frame = self.old_exit_result_frame
