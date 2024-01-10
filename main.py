@@ -190,6 +190,8 @@ class App:
         entrance_button_frame.grid_rowconfigure((0, 1, 2), weight=1, uniform="equal")
         # Adjust the frame to maintain a 16:9 aspect ratio
         ocr_entrance_result_frame.bind("<Configure>", lambda e: ocr_entrance_result_frame.configure(width=int(ocr_entrance_result_frame.winfo_height() * 16 / 9)))
+        self.ocr_entrance_result_frame = ocr_entrance_result_frame
+        self.old_entrance_result_frame = ocr_entrance_result_frame
 
         # Frame đọc thẻ xe vào
         entrance_card_label = tk.Label(entrance_button_frame, text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX", bg="yellow", fg="black", font=("Arial Bold", 15))
@@ -229,7 +231,9 @@ class App:
         exit_button_frame.grid_rowconfigure((0, 1, 2), weight=1, uniform="equal")
         # Adjust the frame to maintain a 16:9 aspect ratio
         ocr_exit_result_frame.bind("<Configure>", lambda e: ocr_exit_result_frame.configure(width=int(ocr_exit_result_frame.winfo_height() * 16 / 9)))
-        
+        self.ocr_exit_result_frame = ocr_exit_result_frame
+        self.old_exit_result_frame = self.ocr_exit_result_frame
+
         # Frame đọc thẻ xe ra
         exit_card_label = tk.Label(exit_button_frame, text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX", bg="yellow", fg="black", font=("Arial Bold", 15))
         exit_card_label.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
@@ -306,6 +310,7 @@ class App:
         self.entrance_ocr_label.config(text="DDDL-DDDDD")
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.restore_entrance_result_frame()
 
     def cancel_entrance_registration(self):
         try:
@@ -319,6 +324,7 @@ class App:
         self.entrance_ocr_label.config(text="DDDL-DDDDD")
         self.entrance_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.entrance_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        self.restore_entrance_result_frame()
 
     def allow_exit_vehicle(self, card_data):
         self.move_exit_snapshot_to_logs()
@@ -328,6 +334,8 @@ class App:
         self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        # Restore the old ocr
+        self.restore_exit_result_frame()
 
     def cancel_exit_registration(self):
         try:
@@ -341,7 +349,14 @@ class App:
         self.exit_ocr_label.config(text="DDDL-DDDDD")
         self.exit_card_label.config(text="Đọc thẻ NULL - Mã thẻ: XX XX XX XX")
         self.exit_time_label.config(text="Giờ vào: DD/MM/YY HH:MM")
+        # Restore the old ocr
+        self.restore_exit_result_frame()
 
+    def restore_exit_result_frame(self):
+        self.ocr_exit_result_frame = self.old_exit_result_frame
+
+    def restore_entrance_result_frame(self):
+        self.ocr_entrance_result_frame = self.old_entrance_result_frame
 
     def update_entrance_card_labels(self, card_data):
         # Take a picture of the vehicle (get the frame from the video feed)
@@ -361,8 +376,25 @@ class App:
             ocr_entrance_result = ocr.extract_text(self.entrance_snapshot_filename)
             print("OCR result:", ocr_entrance_result)
             self.entrance_ocr_label.config(text=ocr_entrance_result)
+            # Insert image temp/extracted.jpg to ocr_entrance_result_frame
+            extracted_image_path = "temp/extracted.jpg"
+            extracted_image = Image.open(extracted_image_path)
+            width, height = extracted_image.size
+            new_width = int(self.old_entrance_result_frame.winfo_width())
+            new_height = int(new_width * 9 / 16)
+            # Resize the extracted image
+            resized_image = extracted_image.resize((new_width, new_height))
+            resized_photo = ImageTk.PhotoImage(resized_image)
+
+            for widget in self.ocr_entrance_result_frame.winfo_children():
+                widget.destroy()
+
+            # Insert the image to ocr_entrance_result_frame
+            image_label = tk.Label(self.ocr_entrance_result_frame, image=resized_photo)
+            image_label.image = resized_photo
+            image_label.pack(fill="both", expand=True)
         except Exception as e:
-            print(f"Error extracting Entrance text: {e}")
+            print(f"Error extracting Entrance text or displaying image: {e}")
 
         self.is_reading_enabled = False
         # Update the card labels with the new card data
@@ -387,8 +419,26 @@ class App:
             ocr_exit_result = ocr.extract_text(self.exit_snapshot_filename)
             print("OCR result:", ocr_exit_result)
             self.exit_ocr_label.config(text=ocr_exit_result)
+            # Insert image temp/extracted.jpg to ocr_exit_result_frame
+            extracted_image_path = "temp/extracted.jpg"
+            extracted_image = Image.open(extracted_image_path)
+            width, height = extracted_image.size
+            # Calculate the new size based on the aspect ratio of the old ocr result frame
+            new_width = int(self.old_exit_result_frame.winfo_width())
+            new_height = int(new_width * 9 / 16)
+            resized_image = extracted_image.resize((new_width, new_height))
+            resized_photo = ImageTk.PhotoImage(resized_image)
+
+            for widget in self.ocr_exit_result_frame.winfo_children():
+                widget.destroy()
+
+            # Insert the image to ocr_exit_result_frame
+            image_label = tk.Label(self.ocr_exit_result_frame, image=resized_photo)
+            image_label.image = resized_photo
+            image_label.pack(fill="both", expand=True)
+
         except Exception as e:
-            print(f"Error extracting Exit text: {e}")
+            print(f"Error extracting Exit text or displaying image: {e}")
 
         self.is_reading_enabled = False
         # Update the card labels with the new card data
@@ -409,6 +459,10 @@ class App:
                 # Move the snapshot to the folder
                 destination_filename = os.path.join(destination_folder, os.path.basename(self.entrance_snapshot_filename))
                 shutil.move(self.entrance_snapshot_filename, destination_filename)
+                # Move the extracted image to the folder
+                extracted_image_path = "temp/extracted.jpg"
+                destination_extracted_image_path = os.path.join(destination_folder, os.path.basename(extracted_image_path))
+                shutil.move(extracted_image_path, destination_extracted_image_path)
                 self.entrance_snapshot_filename = None
                 print("Snapshot moved to logs folder.")
         except Exception as e:
@@ -427,6 +481,10 @@ class App:
                 # Move the snapshot to the folder
                 destination_filename = os.path.join(destination_folder, os.path.basename(self.exit_snapshot_filename))
                 shutil.move(self.exit_snapshot_filename, destination_filename)
+                # Move the extracted image to the folder
+                extracted_image_path = "temp/extracted.jpg"
+                destination_extracted_image_path = os.path.join(destination_folder, os.path.basename(extracted_image_path))
+                shutil.move(extracted_image_path, destination_extracted_image_path)
                 self.exit_snapshot_filename = None
                 print("Snapshot moved to logs folder.")
         except Exception as e:
@@ -439,6 +497,11 @@ class App:
                 os.remove(self.entrance_snapshot_filename)
                 self.entrance_snapshot_filename = None
                 print("Entrance snapshot deleted.")
+            # Delete the extracted image if it exists
+            extracted_image_path = "temp/extracted.jpg"
+            if os.path.exists(extracted_image_path):
+                os.remove(extracted_image_path)
+                print("Extracted image deleted.")
         except Exception as e:
             print(f"Error deleting entrance snapshot: {e}")
 
@@ -449,6 +512,11 @@ class App:
                 os.remove(self.exit_snapshot_filename)
                 self.exit_snapshot_filename = None
                 print("Exit snapshot deleted.")
+            # Delete the extracted image if it exists
+            extracted_image_path = "temp/extracted.jpg"
+            if os.path.exists(extracted_image_path):
+                os.remove(extracted_image_path)
+                print("Extracted image deleted.")
         except Exception as e:
             print(f"Error deleting Exit snapshot: {e}")
 

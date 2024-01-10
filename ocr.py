@@ -90,8 +90,8 @@ def extract_text(path):
                 h = int(plate[3] - plate[1])
                 crop_img = img[y:y+h, x:x+w]
                 cv2.rectangle(img, (int(plate[0]),int(plate[1])), (int(plate[2]),int(plate[3])), color = (0,0,225), thickness = 2)
-                cv2.imwrite("extracted.jpg", crop_img)
-                rc_image = cv2.imread("extracted.jpg")
+                cv2.imwrite("temp/extracted.jpg", crop_img)
+                rc_image = cv2.imread("temp/extracted.jpg")
                 lp = ""
                 count+=1
                 for cc in range(0,2):
