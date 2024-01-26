@@ -1,7 +1,7 @@
 import sys
 sys.dont_write_bytecode = True
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, Scrollbar
 from PIL import Image, ImageTk
 from database_func import parkdb
 import ocr
@@ -83,8 +83,8 @@ class ConfigWindow:
     def __init__(self, root, app):
         self.root = root
         self.app = app
-        self.root.title("Configuration")
-        self.root.geometry("350x300")
+        self.root.title("Cài đặt")
+        self.root.geometry("350x350")
 
         self.entrance_label = tk.Label(self.root, text="Chọn camera cho LUỒNG XE VÀO:")
         self.entrance_label.pack(pady=10)
@@ -101,8 +101,24 @@ class ConfigWindow:
         self.serial_dropdown = ttk.Combobox(self.root, values=self.app.get_serial_ports())
         self.serial_dropdown.pack(pady=10)
 
+        # Load the current configuration
+        self.load_configuration()
+
         self.save_button = tk.Button(self.root, text="Lưu cài đặt", command=self.save_configuration)
         self.save_button.pack(pady=10)
+
+        self.open_log_viewer_button = tk.Button(self.root, text="Mở Nhật ký quản lý", command=self.open_log_viewer)
+        self.open_log_viewer_button.pack(pady=10)
+
+    def load_configuration(self):
+        config = self.app.get_configuration()
+        entrance_camera = config['entrance_camera']
+        exit_camera = config['exit_camera']
+        serial_port = config['serial_port']
+
+        self.entrance_dropdown.set(entrance_camera)
+        self.exit_dropdown.set(exit_camera)
+        self.serial_dropdown.set(serial_port)
 
     def save_configuration(self):
         entrance_camera = self.entrance_dropdown.get()
@@ -117,6 +133,87 @@ class ConfigWindow:
 
         self.app.apply_configuration(config)
         self.root.destroy()
+
+    def open_log_viewer(self):
+        self.root.withdraw()
+
+        log_viewer = tk.Toplevel(self.root)
+        log_viewer.protocol("WM_DELETE_WINDOW", lambda: self.on_log_viewer_close(log_viewer))
+        LogViewer(log_viewer, self.app)
+        log_viewer.resizable(False, False)
+
+    def on_log_viewer_close(self, log_viewer):
+        self.root.deiconify()
+        log_viewer.destroy()
+
+class LogViewer:
+    def __init__(self, root, app):
+        self.root = root
+        self.app = app
+        self.root.title("NHẬT KÝ QUẢN LÝ XE VÀO/RA")
+        self.root.geometry("1200x600")
+
+        self.log_tree = ttk.Treeview(self.root)
+        self.log_tree["columns"] = ("log_id", "card_id", "image_in_path", "ocr_output", "time_in", "time_out", "image_out_path")
+        self.log_tree.column("#0", width=0, stretch="no")
+        self.log_tree.column("log_id", anchor="center", width=30)
+        self.log_tree.column("card_id", anchor="center", width=70)
+        self.log_tree.column("image_in_path", anchor="center", width=225)
+        self.log_tree.column("ocr_output", anchor="center", width=100)
+        self.log_tree.column("time_in", anchor="center", width=100)
+        self.log_tree.column("time_out", anchor="center", width=100)
+        self.log_tree.column("image_out_path", anchor="center", width=225)
+        self.log_tree.heading("#0", text="", anchor="w")
+        self.log_tree.heading("log_id", text="STT", anchor="center")
+        self.log_tree.heading("card_id", text="Mã thẻ", anchor="center")
+        self.log_tree.heading("image_in_path", text="Ảnh xe vào", anchor="center")
+        self.log_tree.heading("ocr_output", text="Kết quả OCR", anchor="center")
+        self.log_tree.heading("time_in", text="Thời gian vào", anchor="center")
+        self.log_tree.heading("time_out", text="Thời gian ra", anchor="center")
+        self.log_tree.heading("image_out_path", text="Ảnh xe ra", anchor="center")
+        self.log_tree.pack(fill="both", expand=True)
+
+        scrollbar = Scrollbar(self.root, orient="vertical", command=self.log_tree.yview)
+        self.log_tree.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.log_tree.configure(yscrollcommand=scrollbar.set)
+
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
+
+        self.log_tree.bind("<Double-1>", self.on_double_click)
+
+        self.load_logs()
+
+    def load_logs(self):
+        logs = parkdb.get_all_logs("parking.db")
+        for log in logs:
+            self.log_tree.insert("", "end", text="", values=log)
+
+    def on_double_click(self, event):
+        try:
+            item = self.log_tree.selection()[0]
+            values = self.log_tree.item(item, "values")
+            choice = messagebox.askquestion("Mở ảnh xác thực", "Hãy chọn mở hình ảnh thời điểm xe vào/ra\n\nYes để mở ảnh xe vào\nNo để mở ảnh xe ra", icon='question', parent=self.root)
+            
+            if choice == 'yes':
+                image_path = values[2]
+            else:
+                if values[6] == "None":
+                    messagebox.showerror("Lỗi", "Không có ảnh xe ra!", parent=self.root)
+                    return
+                image_path = values[6]
+            
+            threading.Thread(target=self.open_image, args=(image_path,)).start()
+        except Exception as e:
+            print(f"Error opening: {e}. Maybe no image is selected.")
+
+    def open_image(self, image_path):
+        try:
+            image = Image.open(image_path)
+            image.show()
+        except Exception as e:
+            print(f"Error opening image: {e}")
 
 class App:
     def __init__(self, root):
@@ -299,7 +396,7 @@ class App:
     def check_card(self, card_data):
         if not self.is_reading_enabled:  # Check if entrance updates are enabled
             return
-        if card_data == "" or card_data == "START!":  # Assuming an empty string indicates the card has been removed
+        if card_data == "" or card_data == "START!" or card_data == "Didn't find PN53x board":  # Assuming an empty string indicates the card has been removed
             return
         else:
             if parkdb.check_card_exists("parking.db", card_data):
@@ -586,6 +683,7 @@ class App:
         config_window = tk.Toplevel(self.root)
         ConfigWindow(config_window, self)
         config_window.resizable(False, False)
+        # Load the current configuration to the config window
 
     def get_video_devices(self):
         devices = []
@@ -593,6 +691,13 @@ class App:
             if cv2.VideoCapture(i).isOpened():
                 devices.append(str(i))  # Append only the ID
         return devices
+    
+    def get_configuration(self):
+        return {
+            'entrance_camera': self.entrance_camera,
+            'exit_camera': self.exit_camera,
+            'serial_port': self.serial_port
+        }
 
     def load_configuration(self):
         try:

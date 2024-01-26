@@ -59,6 +59,14 @@ def get_card_list(db_name):
     c.close()
     return card_ids
 
+def get_all_logs(db_name):
+    c = connect(db_name)
+    cur = c.cursor()
+    cur.execute("SELECT * FROM logs;")
+    logs = cur.fetchall()
+    c.close()
+    return logs
+
 def check_card_exists(db_name, card_id):
     c = connect(db_name)
     cur = c.cursor()
