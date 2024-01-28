@@ -1,6 +1,6 @@
 import sys
 sys.dont_write_bytecode = True
-import tkinter as tk
+from mttkinter import mtTkinter as tk
 from tkinter import ttk, messagebox, Scrollbar
 from PIL import Image, ImageTk
 from database_func import parkdb
@@ -84,6 +84,43 @@ class ConfigWindow:
         self.root = root
         self.app = app
         self.root.title("Cài đặt")
+        self.root.geometry("350x200")
+        
+        self.open_config = tk.Button(self.root, text="Mở cài đặt thiết bị", command=self.open_device_config)
+        self.open_config.pack(pady = 10)
+
+        self.open_log_viewer_button = tk.Button(self.root, text="Mở Nhật ký quản lý", command=self.open_log_viewer)
+        self.open_log_viewer_button.pack(pady=10)
+
+    def open_log_viewer(self):
+        self.root.withdraw()
+
+        log_viewer = tk.Toplevel(self.root)
+        log_viewer.protocol("WM_DELETE_WINDOW", lambda: self.on_log_viewer_close(log_viewer))
+        LogViewer(log_viewer, self.app)
+        log_viewer.resizable(False, False)
+
+    def on_log_viewer_close(self, log_viewer):
+        self.root.deiconify()
+        log_viewer.destroy()
+        
+    def open_device_config(self):
+        self.root.withdraw()
+
+        device_config = tk.Toplevel(self.root)
+        device_config.protocol("WM_DELETE_WINDOW", lambda: self.on_log_viewer_close(device_config))
+        DeviceConfig(device_config, self.app)
+        device_config.resizable(False, False)
+
+    def on_device_config_close(self, device_config):
+        self.root.deiconify()
+        device_config.destroy()
+
+class DeviceConfig:
+    def __init__(self, root, app):
+        self.root = root
+        self.app = app
+        self.root.title("Cài đặt thiết bị")
         self.root.geometry("350x350")
 
         self.entrance_label = tk.Label(self.root, text="Chọn camera cho LUỒNG XE VÀO:")
@@ -106,10 +143,7 @@ class ConfigWindow:
 
         self.save_button = tk.Button(self.root, text="Lưu cài đặt", command=self.save_configuration)
         self.save_button.pack(pady=10)
-
-        self.open_log_viewer_button = tk.Button(self.root, text="Mở Nhật ký quản lý", command=self.open_log_viewer)
-        self.open_log_viewer_button.pack(pady=10)
-
+    
     def load_configuration(self):
         config = self.app.get_configuration()
         entrance_camera = config['entrance_camera']
@@ -133,19 +167,6 @@ class ConfigWindow:
 
         self.app.apply_configuration(config)
         self.root.destroy()
-
-    def open_log_viewer(self):
-        self.root.withdraw()
-
-        log_viewer = tk.Toplevel(self.root)
-        log_viewer.protocol("WM_DELETE_WINDOW", lambda: self.on_log_viewer_close(log_viewer))
-        LogViewer(log_viewer, self.app)
-        log_viewer.resizable(False, False)
-
-    def on_log_viewer_close(self, log_viewer):
-        self.root.deiconify()
-        log_viewer.destroy()
-
 class LogViewer:
     def __init__(self, root, app):
         self.root = root
@@ -253,6 +274,13 @@ class App:
         exit_label = tk.Label(exit_frame, text="LUỒNG XE RA", bg="yellow", font=("Arial", 18))
         exit_label.pack(side="top", fill="both", expand=True)
 
+        # Video feed for exit
+        exit_video_getter = VideoGet(source=self.exit_camera)
+        exit_video_show = VideoShow(exit_frame, exit_video_getter)
+        exit_video_getter.start()
+        exit_video_show.start_showing()
+        self.exit_video_feed = exit_video_getter
+        
         # Video feed for entrance
         entrance_video_getter = VideoGet(source=self.entrance_camera)
         entrance_video_show = VideoShow(entrance_frame, entrance_video_getter)
@@ -260,12 +288,6 @@ class App:
         entrance_video_show.start_showing()
         self.entrance_video_feed = entrance_video_getter
 
-        # Video feed for exit
-        exit_video_getter = VideoGet(source=self.exit_camera)
-        exit_video_show = VideoShow(exit_frame, exit_video_getter)
-        exit_video_getter.start()
-        exit_video_show.start_showing()
-        self.exit_video_feed = exit_video_getter
 
         # Section Nút XE VÀO
         entrance_button_frame = tk.Frame(entrance_frame, highlightbackground="black", highlightthickness=1)
@@ -687,7 +709,7 @@ class App:
 
     def get_video_devices(self):
         devices = []
-        for i in range(5):  # Check the first 5 devices (adjust as needed)
+        for i in range(3):  # Check the first 3 devices (adjust as needed)
             if cv2.VideoCapture(i).isOpened():
                 devices.append(str(i))  # Append only the ID
         return devices
