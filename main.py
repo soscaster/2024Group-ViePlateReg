@@ -337,7 +337,7 @@ class App:
         exit_allow_button = tk.Button(exit_button_frame, text="CHO PHÉP XE RA (F11)", bg="blue", fg="white", font=("Arial", 14), command=lambda: self.allow_exit_vehicle(self.card_data))
         exit_allow_button.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
         
-        exit_cancel_button = tk.Button(exit_button_frame, text="HUỶ XE RA (F12)", bg="red", fg="white", font=("Arial", 14), command=self.cancel_exit_registration)
+        exit_cancel_button = tk.Button(exit_button_frame, text="HUỶ XE RA (F12)", bg="red", fg="white", font=("Arial", 14), command=lambda: self.cancel_exit_registration())
         exit_cancel_button.grid(row=4, column=0, padx=5, pady=5, sticky="ew")
 
         # 3 dòng kết quả nhận diện xe ra
